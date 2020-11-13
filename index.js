@@ -72,7 +72,7 @@ class server_entry{
           con.query("select * from login where uname = ?", [username], function(err, rows)
           {
             if (err) return done(true,req.flash('message',err));
-           
+           //checkPP
              if(!rows.length)
              { 
                return done(true, false, req.flash('message','Invalid username or password.')); 
