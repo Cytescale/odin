@@ -2,6 +2,7 @@
 var mysql = require('mysql');
 const express = require('express');
 const fs = require('fs');
+var qs = require('querystring')
 const app = express();
 const server_setting = require('./server_setting').setting;
 const odinbaase_config_data = require('./config/odinbase_config').data;
@@ -12,7 +13,7 @@ var crypto            = require('crypto');
 var passport          = require('passport');
 var LocalStrategy     = require('passport-local').Strategy;
 var  session              = require('express-session');
-var cors  = require('cors');
+var config = require('./env.json')[process.env.NODE_ENV || 'development'];
 //var BetterMemoryStore = require('session-memory-store')(sess);
 
 function isAuthenticated(req, res, next) {
@@ -42,6 +43,8 @@ class server_entry{
       console.error("DATABASE CONNECTION FAILED");
     }
 
+
+
     app.use(bodyParser.urlencoded({ extended: true }));
     app.use(bodyParser.json());
     app.use(session({ secret: 'keyboard cat',resave: true, saveUninitialized:true}));
@@ -56,22 +59,33 @@ class server_entry{
       usernameField: 'uname',
       passwordField: 'pass',
       passReqToCallback: true
-    } , function (req, username, password, done){
-        console.log("START CHECK ON"+username);
-          if(!username || !password ) { return done(103, false, req.flash('message','All fields are required.')); }
+    } ,
+     function (req, username, password, done)
+     {
+        console.log("START CHECK ON "+username);
+
+          if(!username || !password ) 
+          {
+             return done(103, false, req.flash('message','All fields are required.')); 
+          }
           var salt = '7fa73b47df808d36c5fe328546ddef8b9011b2c6';
-          con.query("select * from login where uname = ?", [username], function(err, rows){
-              console.log(err); console.log(rows);
-            if (err) return done(104,req.flash('message',err));
-            if(!rows.length){ return done(102, false, req.flash('message','Invalid username or password.')); }
+          con.query("select * from login where uname = ?", [username], function(err, rows)
+          {
+            if (err) return done(true,req.flash('message',err));
+           
+             if(!rows.length)
+             { 
+               return done(true, false, req.flash('message','Invalid username or password.')); 
+              }
             salt = salt+''+password;
             var encPassword = crypto.createHash('sha1').update(salt).digest('hex');
             var dbPassword  = rows[0].pass;
-            if(!(dbPassword == password)){
+            if(!(dbPassword == password))
+            {
                 console.log("PASS DIDNT MATCH");
-                return done(101, false, req.flash('message','Invalid username or password.'));
+                return done(true, false, req.flash('message','Invalid username or password.'));
              }
-            return done(200, rows[0]);
+            return done(false, rows[0]);
           });
         }
     ));
@@ -89,6 +103,7 @@ class server_entry{
       res.send("SERVER RESPONSE");
     });
 
+
     app.get('/isAuth',isAuthenticated, function(req, res, next) { 
       res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE')
@@ -104,29 +119,27 @@ class server_entry{
       });
     
     });
-
+  
     app.post('/loginattempt',(req, res, next)=>{
       res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE')
-      console.log("LOGIN REQUEST GOT");
-      console.log("BODY"+req.body.pass);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+        res.setHeader('Access-Control-Allow-Credentials','true');
+        console.log("BODY"+JSON.stringify(req.body));
       passport.authenticate('local', (err, user, info)=>{        
-        if (err) {         
-          console.log("LOGIN ERROR RESPONSE "+err);
-          return res.send("RESPONSE"+err);
-          //return next(err); 
+        if (err) {    
+          console.log("err"+err)     
+          res.send(JSON.stringify({errcode:err,user:null,message:'login error'}));
+          return next(err);
         }
         if (!user) { 
-          console.log("LOGIN ERROR RESPONSE NO USER"+err);
-          return res.send("RESPONSE"+err);; 
+          console.log("user false"+err)     
+          return res.send(JSON.stringify({errcode:err,user:null,message:'login fail'}));
         }
         req.logIn(user, (err)=>{
           if (err) {
-              console.log("LOGIN ERROR LOG IN AATTMP "+err);
-             return next(err); 
+            return next(err);
             }
-            console.log("LOGIN DONE");
-          return res.send(202);;
+          return res.send(JSON.stringify({errcode:false,user:user.id,message:'login success'}));
         });
       })(req, res, next);
     });
