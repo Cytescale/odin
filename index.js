@@ -13,6 +13,9 @@ var crypto            = require('crypto');
 var passport          = require('passport');
 var LocalStrategy     = require('passport-local').Strategy;
 var  session              = require('express-session');
+const jwt = require('jsonwebtoken');
+const ExtractJWT = require('passport-jwt').ExtractJwt;
+
 var config = require('./env.json')[process.env.NODE_ENV || 'development'];
 //var BetterMemoryStore = require('session-memory-store')(sess);
 
@@ -117,7 +120,7 @@ class server_entry{
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
         res.send(result[0]).status(200);
       });
-    
+      
     });
   
     app.post('/loginattempt',(req, res, next)=>{
@@ -126,7 +129,7 @@ class server_entry{
         res.setHeader('Access-Control-Allow-Credentials','true');
         console.log("BODY"+JSON.stringify(req.body));
       passport.authenticate('local', (err, user, info)=>{        
-        if (err) {    
+        if (err===false) {    
           console.log("err"+err)     
           res.send(JSON.stringify({errcode:err,user:null,message:'login error'}));
           return next(err);
@@ -139,7 +142,8 @@ class server_entry{
           if (err) {
             return next(err);
             }
-          return res.send(JSON.stringify({errcode:false,user:user.id,message:'login success'}));
+            const token = jwt.sign({id:user.id}, 'TOP_SECRET');
+          return res.send(JSON.stringify({errcode:false,user:token,message:'login success'}));
         });
       })(req, res, next);
     });
